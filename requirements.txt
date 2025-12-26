@@ -1,0 +1,6 @@
+KOV==0.1.0
+langchain>=0.0.350
+ollama
+typer>=0.9.0
+rich>=13.0.0
+requests
