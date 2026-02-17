@@ -27,7 +27,7 @@
 
 2. **Pull a compatible model**:
    ```bash
-   ollama pull llama3.2:3b
+   ollama pull llama3:latest
    ```
 
 ### Installation
@@ -92,7 +92,7 @@ This architecture matches the sophistication of OpenAI's superalignment agents, 
 ### Models
 
 KOV works with any Ollama-compatible model. Recommended models:
-- `llama3.2:3b` (default, good balance of speed and capability)
+- `llama3:latest` (default, good balance of speed and capability)
 - `mistral:7b-instruct` (alternative option)
 - `deepseek-r1:8b` (if available)
 
@@ -101,6 +101,16 @@ KOV works with any Ollama-compatible model. Recommended models:
 - **Auto-execute**: File reading, directory listing, URL fetching
 - **Require confirmation**: File deletion, shell commands, file downloads
 - **Forbidden**: None by default (all tools available with appropriate safeguards)
+
+### Workspace Scope
+
+File operations are scoped to a workspace root. Configure with:
+
+```bash
+export KOV_WORKSPACE_ROOT=/path/to/project
+```
+
+If not set, KOV uses the current working directory.
 
 ## 📦 Package Structure
 
@@ -121,13 +131,13 @@ KOV/
 
 ## 🧪 Testing
 
-Run the comprehensive test suite:
+Run the test suite:
 
 ```bash
-python test_comprehensive.py
+pytest -q
 ```
 
-This tests all 6 layers, edge cases, error scenarios, and safety policies.
+This covers tool safety controls, structured error handling, and agent parameter extraction.
 
 ## 🤝 Contributing
 

@@ -110,6 +110,7 @@ test_*.txt
 hello.py
 interactive_test.py
 test_*.py
+!tests/test_*.py
 james.test
 snapshots/
 storage/

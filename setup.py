@@ -7,8 +7,12 @@ setup(
     packages=find_packages(),
     install_requires=[
         "langchain>=0.0.350",
+        "langchain-ollama>=0.1.0",
         "ollama",
         "typer>=0.9.0",
+        "rich>=13.0.0",
+        "requests",
+        "pytest>=8.0.0",
     ],
     entry_points={
         "console_scripts": [

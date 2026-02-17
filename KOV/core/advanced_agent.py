@@ -3,7 +3,8 @@ Advanced Agent Loop for KOV with 6-layer architecture
 """
 
 import logging
-from typing import Dict, List, Any, Optional, Literal
+import shlex
+from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
 from enum import Enum
 from langchain_ollama import ChatOllama
@@ -60,9 +61,10 @@ class Reflection:
 class AdvancedKOVAgent:
     """Advanced KOV Agent with 6-layer architecture"""
     
-    def __init__(self, debug: bool = False):
+    def __init__(self, debug: bool = False, model: str = "llama3:latest"):
         self.debug = debug
-        self.llm = ChatOllama(model="llama3.2:3b", temperature=0.1)
+        self.model = model
+        self.llm = ChatOllama(model=model, temperature=0.1)
         self.conversation_history = []
         
         # Tool policies
@@ -86,6 +88,71 @@ class AdvancedKOVAgent:
             "fetch_url_tool": fetch_url,
             "download_file_tool": download_file,
         }
+
+    def _extract_tool_parameters(self, tool_name: str, user_input: str) -> Dict[str, Any]:
+        """Extract tool parameters using deterministic parsing with safe defaults."""
+        tokens = shlex.split(user_input) if user_input.strip() else []
+        lowered = user_input.lower()
+
+        if tool_name == "list_directory_tool":
+            if " in " in lowered:
+                return {"path": user_input.split(" in ", 1)[1].strip().strip("'\"") or "."}
+            return {"path": "."}
+
+        if tool_name in {"read_file_tool", "delete_file_tool"}:
+            if " " in user_input:
+                candidate = user_input.split(" ", 1)[1].strip().strip("'\"")
+                return {"path": candidate or "."}
+            return {"path": "."}
+
+        if tool_name == "run_shell_tool":
+            command_text = user_input
+            for prefix in ("run ", "execute ", "shell "):
+                if lowered.startswith(prefix):
+                    command_text = user_input[len(prefix):]
+                    break
+            return {"command": command_text.strip()}
+
+        if tool_name == "write_file_tool":
+            # Expected pattern: write <path> with <content>
+            if " with " in lowered:
+                lhs, rhs = user_input.split(" with ", 1)
+                lhs_tokens = shlex.split(lhs)
+                path = lhs_tokens[-1] if lhs_tokens else "output.txt"
+                return {"path": path, "content": rhs}
+            if len(tokens) >= 2:
+                return {"path": tokens[-1], "content": "default content"}
+            return {"path": "output.txt", "content": "default content"}
+
+        if tool_name == "fetch_url_tool":
+            for token in tokens:
+                if token.startswith("http://") or token.startswith("https://"):
+                    return {"url": token}
+            return {"url": user_input.strip()}
+
+        if tool_name == "download_file_tool":
+            url = ""
+            filename = "downloaded.file"
+            for token in tokens:
+                if token.startswith("http://") or token.startswith("https://"):
+                    url = token
+            if " to " in lowered:
+                filename = user_input.split(" to ", 1)[1].strip().strip("'\"") or filename
+            return {"url": url, "filename": filename}
+
+        return {}
+
+    def _format_tool_output(self, execution: ToolExecution) -> str:
+        """Render structured tool output for user response."""
+        output = execution.output
+        if isinstance(output, dict):
+            if output.get("ok"):
+                data = output.get("data")
+                if isinstance(data, list):
+                    return "\n".join(str(item) for item in data)
+                return str(data)
+            return output.get("error", "Tool execution failed")
+        return str(output)
     
     def classify_intent(self, user_input: str) -> Intent:
         """Layer 1: Intent Classification"""
@@ -196,66 +263,25 @@ Available tools: read_file_tool, write_file_tool, list_directory_tool, delete_fi
             if confirm.lower() != 'y':
                 return ToolExecution(tool_name, {}, None, False, "User cancelled")
         
-        # Extract parameters using LLM
-        if tool_name == "read_file_tool":
-            # Simple parameter extraction for read_file
-            import re
-            path_match = re.search(r'(?:read|show|display)\s+(.+?)(?:\s|$)', user_input, re.IGNORECASE)
-            if path_match:
-                parameters = {"path": path_match.group(1).strip()}
-            else:
-                parameters = {"path": user_input.split()[-1] if user_input.split() else "."}
-        elif tool_name == "write_file_tool":
-            # Simple parameter extraction for write_file
-            import re
-            # Look for patterns like "create file.txt with content"
-            match = re.search(r'(?:create|write)\s+(.+?)\s+(?:with|containing)\s+(.+)', user_input, re.IGNORECASE)
-            if match:
-                parameters = {"path": match.group(1).strip(), "content": match.group(2).strip()}
-            else:
-                words = user_input.split()
-                if len(words) >= 2:
-                    parameters = {"path": words[-1], "content": "default content"}
-                else:
-                    parameters = {"path": "default.txt", "content": "default content"}
-        elif tool_name == "list_directory_tool":
-            parameters = {"path": "."}  # Default to current directory
-        elif tool_name == "run_shell_tool":
-            # Extract command
-            import re
-            cmd_match = re.search(r'(?:run|execute)\s+(.+)', user_input, re.IGNORECASE)
-            if cmd_match:
-                parameters = {"command": cmd_match.group(1).strip()}
-            else:
-                parameters = {"command": "echo 'no command specified'"}
-        else:
-            # Use LLM for complex parameter extraction
-            param_prompt = f"""
-Extract parameters for {tool_name} from: "{user_input}"
-
-Respond with parameters in format: param1=value1|param2=value2
-If no parameters needed, respond: NONE
-"""
-            param_response = self.llm.invoke([SystemMessage(content=param_prompt)])
-            parameters = {}
-            if param_response.content.strip() != "NONE":
-                for param in param_response.content.strip().split('|'):
-                    if '=' in param:
-                        key, value = param.split('=', 1)
-                        parameters[key.strip()] = value.strip()
+        # Extract parameters using deterministic parsing
+        parameters = self._extract_tool_parameters(tool_name, user_input)
         
         # Execute tool
         try:
             tool_func = self.tools[tool_name]
-            if parameters:
-                if len(parameters) == 1:
-                    output = tool_func(list(parameters.values())[0])
+            output = tool_func(**parameters) if parameters else tool_func()
+            success = bool(isinstance(output, dict) and output.get("ok"))
+
+            if tool_name == "run_shell_tool" and isinstance(output, dict):
+                success = success and bool(output.get("meta", {}).get("succeeded", False))
+
+            error_message = None
+            if not success:
+                if isinstance(output, dict):
+                    error_message = output.get("error", "Tool failed")
                 else:
-                    output = tool_func(**parameters)
-            else:
-                output = tool_func()
-            
-            return ToolExecution(tool_name, parameters, output, True)
+                    error_message = "Tool failed"
+            return ToolExecution(tool_name, parameters, output, success, error_message)
         
         except Exception as e:
             return ToolExecution(tool_name, parameters, None, False, str(e))
@@ -351,10 +377,16 @@ If no parameters needed, respond: NONE
             # Generate final response
             successful_executions = [e for e in executions if e.success]
             if successful_executions:
-                last_output = successful_executions[-1].output
-                return f"Task completed successfully!\n\n{last_output}"
-            else:
-                return "I encountered some issues completing your request. Please try rephrasing or being more specific."
+                last_execution = successful_executions[-1]
+                rendered = self._format_tool_output(last_execution)
+                return f"Task completed successfully.\n\n{rendered}"
+
+            failed = [e for e in executions if not e.success]
+            if failed:
+                reasons = "; ".join(e.error or "Unknown error" for e in failed[:3])
+                return f"I could not complete your request. Failure details: {reasons}"
+
+            return "I encountered issues completing your request. Please rephrase with explicit paths or commands."
         
         except Exception as e:
             if self.debug:

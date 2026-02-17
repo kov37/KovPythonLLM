@@ -54,7 +54,7 @@ class KOVAgent:
     
     def __init__(self, debug: bool = False):
         self.debug = debug
-        self.llm = ChatOllama(model="llama3.2:3b", temperature=0.1)
+        self.llm = ChatOllama(model="llama3:latest", temperature=0.1)
         self.tools = [read_file_tool, write_file_tool, list_directory_tool, delete_file_tool, run_shell_tool, fetch_url_tool, download_file_tool]
         self.llm_with_tools = self.llm.bind_tools(self.tools)
         self.agent = self._create_agent()
@@ -95,7 +95,7 @@ class KOVAgent:
         """Process user input and return agent response."""
         system_message = SystemMessage(content="""You are KOV, a helpful AI assistant with access to file system, shell, and internet tools. 
 
-Have natural conversations with users. When they mention files, directories, want to run commands, or need internet access, automatically use your tools to help them. Don't ask permission - just do what makes sense.
+Have natural conversations with users. When they mention files, directories, commands, or internet access, use tools where appropriate, but apply safety constraints.
 
 Examples:
 - If they say "what files are here?" → use list_directory_tool

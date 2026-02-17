@@ -40,11 +40,11 @@ def setup_logging(debug: bool = False):
         ]
     )
 
-def print_banner():
+def print_banner(model: str):
     """Print KOV welcome banner with rich formatting."""
     banner = Panel.fit(
         "[bold blue]🤖 KOV - Local AI Developer Agent[/bold blue]\n"
-        "[dim]Powered by llama3.2:3b via Ollama[/dim]\n"
+        f"[dim]Powered by {model} via Ollama[/dim]\n"
         "[dim]Local + Internet Access Available[/dim]\n\n"
         "[yellow]Commands:[/yellow] /quit, /help, /clear, /debug",
         border_style="blue"
@@ -81,7 +81,7 @@ def show_thinking_indicator(stop_event):
 def main(
     ctx: typer.Context,
     debug: bool = typer.Option(False, "--debug", "-d", help="Enable debug mode"),
-    model: str = typer.Option("llama3.2:3b", "--model", "-m", help="Ollama model to use"),
+    model: str = typer.Option("llama3:latest", "--model", "-m", help="Ollama model to use"),
     version: bool = typer.Option(False, "--version", "-v", help="Show version")
 ):
     """KOV - Local AI Developer Agent. Start interactive chat by default."""
@@ -93,14 +93,14 @@ def main(
         # Default behavior - start chat
         start_chat(debug, model)
 
-def start_chat(debug: bool = False, model: str = "llama3.2:3b"):
+def start_chat(debug: bool = False, model: str = "llama3:latest"):
     """Start interactive chat session with KOV agent."""
     setup_logging(debug)
-    print_banner()
+    print_banner(model)
     
     try:
         with console.status("[bold green]Initializing Advanced KOV...", spinner="dots"):
-            agent = AdvancedKOVAgent(debug=debug)
+            agent = AdvancedKOVAgent(debug=debug, model=model)
         
         console.print("[green]✓[/green] KOV initialized successfully!\n")
         debug_mode = debug
@@ -122,13 +122,13 @@ def start_chat(debug: bool = False, model: str = "llama3.2:3b"):
                     continue
                 elif user_input.lower() == '/clear':
                     with console.status("[yellow]Clearing conversation history...", spinner="dots"):
-                        agent = AdvancedKOVAgent(debug=debug_mode)
+                        agent = AdvancedKOVAgent(debug=debug_mode, model=model)
                     console.print("[green]✓[/green] Conversation history cleared.\n")
                     continue
                 elif user_input.lower() == '/debug':
                     debug_mode = not debug_mode
                     with console.status("[yellow]Toggling debug mode...", spinner="dots"):
-                        agent = AdvancedKOVAgent(debug=debug_mode)
+                        agent = AdvancedKOVAgent(debug=debug_mode, model=model)
                     status = "enabled" if debug_mode else "disabled"
                     console.print(f"[green]✓[/green] Debug mode {status}.\n")
                     continue
@@ -169,6 +169,9 @@ def start_chat(debug: bool = False, model: str = "llama3.2:3b"):
             except KeyboardInterrupt:
                 console.print("\n[yellow]Goodbye! 👋[/yellow]")
                 break
+            except EOFError:
+                console.print("\n[yellow]Input stream closed. Exiting.[/yellow]")
+                break
             except Exception as e:
                 console.print(f"[red]Error:[/red] {str(e)}")
                 if debug_mode:
@@ -183,7 +186,7 @@ def start_chat(debug: bool = False, model: str = "llama3.2:3b"):
 @app.command()
 def chat(
     debug: bool = typer.Option(False, "--debug", "-d", help="Enable debug mode"),
-    model: str = typer.Option("llama3.2:3b", "--model", "-m", help="Ollama model to use")
+    model: str = typer.Option("llama3:latest", "--model", "-m", help="Ollama model to use")
 ):
     """Start interactive chat session with KOV agent (same as default behavior)."""
     start_chat(debug, model)
