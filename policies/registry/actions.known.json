@@ -1,0 +1,13 @@
+{
+  "policy_id": "policy.actions.known",
+  "schema_version": "1.0",
+  "title": "Unknown actions fail closed",
+  "requirement": "Only discriminated action variants registered by the controller may execute.",
+  "policy_class": "immutable_root",
+  "owner_component": "KOV.contracts.actions.AgentAction",
+  "enforcement": "Pydantic discrimination and final controller fallback reject unknown kinds.",
+  "applicable_states": [],
+  "verification_tests": ["tests/unit/test_contracts.py::test_unknown_action_is_rejected"],
+  "failure_mode": "fail_closed",
+  "enabled": true
+}

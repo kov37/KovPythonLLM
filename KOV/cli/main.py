@@ -1,210 +1,169 @@
-#!/usr/bin/env python3
-"""
-KOV CLI - Main entry point
-Rich UI with loading indicators and responsive feedback
-"""
+"""KOV operator CLI for chat, autonomous coding, and protected controls."""
 
-import os
-import sys
-import logging
+from __future__ import annotations
+
+import asyncio
+import json
+from pathlib import Path
+from typing import Annotated
+
 import typer
-from typing import Optional
 from rich.console import Console
-from rich.prompt import Prompt
-from rich.spinner import Spinner
-from rich.live import Live
 from rich.panel import Panel
-from rich.text import Text
-from rich.markdown import Markdown
-import threading
-import time
-from KOV.core.advanced_agent import AdvancedKOVAgent
+from rich.prompt import Prompt
 
-app = typer.Typer(
-    name="kov",
-    help="KOV - Local AI Developer Agent",
-    add_completion=False
-)
+from KOV.control.agent_loop import run_agent
+from KOV.control.stop import StopController
+from KOV.diagnostics.doctor import CheckStatus, run_doctor
+from KOV.models.chat_gateway import ADKChatGateway
+from KOV.runtime.privacy import apply_local_privacy_defaults
 
+apply_local_privacy_defaults()
+
+app = typer.Typer(name="kov", help="Deterministic local continual-improvement agent")
 console = Console()
 
-def setup_logging(debug: bool = False):
-    """Configure logging for KOV operations."""
-    level = logging.DEBUG if debug else logging.INFO
-    logging.basicConfig(
-        level=level,
-        format='%(asctime)s - %(levelname)s - %(message)s',
-        handlers=[
-            logging.FileHandler('kov.log'),
-            logging.StreamHandler() if debug else logging.NullHandler()
-        ]
-    )
 
-def print_banner(model: str):
-    """Print KOV welcome banner with rich formatting."""
-    banner = Panel.fit(
-        "[bold blue]🤖 KOV - Local AI Developer Agent[/bold blue]\n"
-        f"[dim]Powered by {model} via Ollama[/dim]\n"
-        "[dim]Local + Internet Access Available[/dim]\n\n"
-        "[yellow]Commands:[/yellow] /quit, /help, /clear, /debug",
-        border_style="blue"
-    )
-    console.print(banner)
-    console.print()
+def state_root() -> Path:
+    return Path(__file__).resolve().parents[2] / ".kov-state"
 
-def print_help():
-    """Print available commands with rich formatting."""
-    help_text = """
-[bold yellow]Available Commands:[/bold yellow]
-• [cyan]/quit, /exit[/cyan]  - Exit KOV
-• [cyan]/help[/cyan]         - Show this help
-• [cyan]/clear[/cyan]        - Clear conversation history
-• [cyan]/debug[/cyan]        - Toggle debug mode
-
-[bold yellow]Example Usage:[/bold yellow]
-• "What files are in this directory?"
-• "Show me the README file"
-• "Check what's on google.com"
-• "Create a Python script"
-• "Download a file from URL"
-    """
-    console.print(Panel(help_text, border_style="yellow", title="Help"))
-
-def show_thinking_indicator(stop_event):
-    """Show a thinking indicator while processing."""
-    spinner = Spinner("dots", text="[dim]KOV is thinking...[/dim]")
-    with Live(spinner, console=console, refresh_per_second=10):
-        while not stop_event.is_set():
-            time.sleep(0.1)
 
 @app.callback(invoke_without_command=True)
 def main(
     ctx: typer.Context,
-    debug: bool = typer.Option(False, "--debug", "-d", help="Enable debug mode"),
-    model: str = typer.Option("llama3:latest", "--model", "-m", help="Ollama model to use"),
-    version: bool = typer.Option(False, "--version", "-v", help="Show version")
-):
-    """KOV - Local AI Developer Agent. Start interactive chat by default."""
+    version: bool = typer.Option(False, "--version", "-v", help="Show version"),
+) -> None:
+    """Start private stateless chat when no command is supplied."""
+
     if version:
-        show_version()
-        return
-    
-    if ctx.invoked_subcommand is None:
-        # Default behavior - start chat
-        start_chat(debug, model)
+        from KOV import __version__
 
-def start_chat(debug: bool = False, model: str = "llama3:latest"):
-    """Start interactive chat session with KOV agent."""
-    setup_logging(debug)
-    print_banner(model)
-    
-    try:
-        with console.status("[bold green]Initializing Advanced KOV...", spinner="dots"):
-            agent = AdvancedKOVAgent(debug=debug, model=model)
-        
-        console.print("[green]✓[/green] KOV initialized successfully!\n")
-        debug_mode = debug
-        
-        while True:
-            try:
-                # Rich prompt with custom styling
-                user_input = Prompt.ask(
-                    "[bold cyan]❯[/bold cyan]",
-                    console=console
-                ).strip()
-                
-                # Handle special commands
-                if user_input.lower() in ['/quit', '/exit']:
-                    console.print("[yellow]Goodbye! 👋[/yellow]")
-                    break
-                elif user_input.lower() == '/help':
-                    print_help()
-                    continue
-                elif user_input.lower() == '/clear':
-                    with console.status("[yellow]Clearing conversation history...", spinner="dots"):
-                        agent = AdvancedKOVAgent(debug=debug_mode, model=model)
-                    console.print("[green]✓[/green] Conversation history cleared.\n")
-                    continue
-                elif user_input.lower() == '/debug':
-                    debug_mode = not debug_mode
-                    with console.status("[yellow]Toggling debug mode...", spinner="dots"):
-                        agent = AdvancedKOVAgent(debug=debug_mode, model=model)
-                    status = "enabled" if debug_mode else "disabled"
-                    console.print(f"[green]✓[/green] Debug mode {status}.\n")
-                    continue
-                    
-                if not user_input:
-                    continue
-                
-                # Show thinking indicator in separate thread
-                stop_event = threading.Event()
-                thinking_thread = threading.Thread(target=show_thinking_indicator, args=(stop_event,))
-                thinking_thread.start()
-                
-                try:
-                    # Process with agent
-                    response = agent.run(user_input)
-                    
-                    # Stop thinking indicator
-                    stop_event.set()
-                    thinking_thread.join()
-                    
-                    # Display response with rich formatting
-                    response_panel = Panel(
-                        Markdown(response),
-                        border_style="green",
-                        title="[bold green]KOV Response[/bold green]",
-                        title_align="left"
-                    )
-                    console.print(response_panel)
-                    console.print()
-                    
-                except Exception as e:
-                    stop_event.set()
-                    thinking_thread.join()
-                    console.print(f"[red]Error:[/red] {str(e)}")
-                    if debug_mode:
-                        console.print_exception()
-                
-            except KeyboardInterrupt:
-                console.print("\n[yellow]Goodbye! 👋[/yellow]")
-                break
-            except EOFError:
-                console.print("\n[yellow]Input stream closed. Exiting.[/yellow]")
-                break
-            except Exception as e:
-                console.print(f"[red]Error:[/red] {str(e)}")
-                if debug_mode:
-                    console.print_exception()
-                    
-    except Exception as e:
-        console.print(f"[red]Failed to initialize KOV:[/red] {str(e)}")
-        if debug:
-            console.print_exception()
-        sys.exit(1)
+        console.print(f"KOV {__version__}")
+    elif ctx.invoked_subcommand is None:
+        chat()
+
 
 @app.command()
-def chat(
-    debug: bool = typer.Option(False, "--debug", "-d", help="Enable debug mode"),
-    model: str = typer.Option("llama3:latest", "--model", "-m", help="Ollama model to use")
-):
-    """Start interactive chat session with KOV agent (same as default behavior)."""
-    start_chat(debug, model)
+def chat() -> None:
+    """General local chat; prompts are not written to KOV's ledger."""
 
-@app.command()
-def version():
-    """Show KOV version information."""
-    show_version()
-
-def show_version():
-    """Display version information."""
-    from KOV import __version__
-    version_panel = Panel(
-        f"[bold blue]KOV version {__version__}[/bold blue]\n"
-        "[dim]Local AI Developer Agent[/dim]",
-        border_style="blue"
+    console.print(
+        Panel.fit(
+            "[bold green]KOV private chat[/bold green]\nFresh bounded context · /quit to exit",
+            border_style="green",
+        )
     )
-    console.print(version_panel)
+    gateway = ADKChatGateway()
+    while True:
+        try:
+            prompt = Prompt.ask("[bold cyan]❯[/bold cyan]").strip()
+        except (KeyboardInterrupt, EOFError):
+            break
+        if prompt.lower() in {"/quit", "/exit"}:
+            break
+        if not prompt:
+            continue
+        with console.status("[green]Thinking…[/green]"):
+            reply = asyncio.run(gateway.answer(prompt))
+        console.print(Panel(reply.answer, border_style="green"))
+        if reply.uncertainties:
+            console.print("[yellow]Uncertainty:[/yellow] " + "; ".join(reply.uncertainties))
+
+
+@app.command()
+def improve(
+    task: Annotated[str, typer.Argument(help="One focused repository improvement")],
+    repo: Annotated[Path, typer.Option("--repo", help="Target Git repository")] = Path(
+        "/home/digichameleon/adk/research-agent"
+    ),
+) -> None:
+    """Run one isolated deterministic coding candidate."""
+
+    with console.status("[green]KOV is executing a bounded candidate…[/green]"):
+        result = run_agent(task, str(repo))
+    console.print_json(
+        json.dumps(
+            {
+                "run_id": result.run_id,
+                "candidate_id": result.candidate_id,
+                "status": result.status,
+                "iterations": result.iterations,
+                "branch": result.branch,
+                "worktree": str(result.worktree),
+                "changed_files": result.changed_files,
+                "summary": result.final_summary,
+            }
+        )
+    )
+    if result.status != "passed":
+        raise typer.Exit(1)
+
+
+@app.command("doctor")
+def doctor_command(json_output: bool = typer.Option(False, "--json")) -> None:
+    """Run read-only machine and dependency readiness checks."""
+
+    report = run_doctor()
+    if json_output:
+        console.print_json(report.model_dump_json())
+    else:
+        for check in report.checks:
+            color = {
+                CheckStatus.PASS: "green",
+                CheckStatus.WARN: "yellow",
+                CheckStatus.FAIL: "red",
+            }[check.status]
+            console.print(f"[{color}]{check.status.value.upper():>4}[/{color}] {check.summary}")
+    if not report.ready:
+        raise typer.Exit(1)
+
+
+@app.command()
+def status() -> None:
+    """Show durable Pause and Emergency Stop state."""
+
+    current = StopController(state_root() / "control").status()
+    console.print_json(
+        json.dumps(
+            {
+                "paused": current.paused,
+                "emergency_stopped": current.emergency_stopped,
+            }
+        )
+    )
+
+
+@app.command()
+def pause(reason: str = typer.Argument(...)) -> None:
+    """Pause autonomous work at the next atomic boundary."""
+
+    StopController(state_root() / "control").pause(reason)
+    console.print("[yellow]KOV paused.[/yellow]")
+
+
+@app.command("emergency-stop")
+def emergency_stop(reason: str = typer.Argument(...)) -> None:
+    """Persistently stop all future KOV action loops."""
+
+    StopController(state_root() / "control").emergency_stop(reason)
+    console.print("[red]Emergency Stop is active.[/red]")
+
+
+@app.command()
+def resume() -> None:
+    """Clear Pause locally. Emergency Stop requires its explicit command."""
+
+    StopController(state_root() / "control").resume(locally_authorized=True)
+    console.print("[green]Pause cleared.[/green]")
+
+
+@app.command("clear-emergency-stop")
+def clear_emergency_stop() -> None:
+    """Clear Emergency Stop from the local operator terminal."""
+
+    StopController(state_root() / "control").clear_emergency_stop(locally_authorized=True)
+    console.print("[green]Emergency Stop cleared.[/green]")
+
 
 if __name__ == "__main__":
     app()

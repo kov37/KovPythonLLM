@@ -1,0 +1,26 @@
+[Unit]
+Description=KOV deterministic continual improvement controller
+After=network.target ollama.service
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=simple
+WorkingDirectory=%h/codexTest/KovPythonLLM
+ExecStart=%h/codexTest/KovPythonLLM/.venv/bin/python -m KOV.daemon
+Restart=on-failure
+RestartSec=15
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=%h/codexTest/KovPythonLLM/.kov-state %h/.local/share/kov %h/adk/research-agent
+UMask=0077
+Environment=GOOGLE_ADK_CONTENT_TELEMETRY_ENABLED=false
+Environment=OTEL_TRACES_EXPORTER=none
+Environment=OTEL_METRICS_EXPORTER=none
+Environment=OTEL_LOGS_EXPORTER=none
+Environment=KOV_AUTO_MERGE=true
+
+[Install]
+WantedBy=default.target

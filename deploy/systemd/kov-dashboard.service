@@ -1,0 +1,19 @@
+[Unit]
+Description=KOV localhost operator dashboard
+After=kov.service
+
+[Service]
+Type=simple
+WorkingDirectory=%h/codexTest/KovPythonLLM
+ExecStart=%h/codexTest/KovPythonLLM/.venv/bin/kov-dashboard
+Restart=on-failure
+RestartSec=10
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=%h/codexTest/KovPythonLLM/.kov-state
+UMask=0077
+
+[Install]
+WantedBy=default.target

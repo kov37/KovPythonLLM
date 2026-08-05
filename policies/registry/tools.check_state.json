@@ -1,0 +1,13 @@
+{
+  "policy_id": "policy.tools.check_state",
+  "schema_version": "1.0",
+  "title": "Check action lifecycle authorization",
+  "requirement": "Named checks run only during baseline, syntax, test, or review states.",
+  "policy_class": "protected_controller",
+  "owner_component": "KOV.control.policies.PolicyRegistry",
+  "enforcement": "RunCheckAction requires one of the explicit check states.",
+  "applicable_states": ["baselining", "validating_syntax", "testing", "reviewing"],
+  "verification_tests": ["tests/unit/test_control.py::test_check_action_state_authorization"],
+  "failure_mode": "fail_closed",
+  "enabled": true
+}

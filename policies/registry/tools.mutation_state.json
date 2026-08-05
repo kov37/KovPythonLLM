@@ -1,0 +1,13 @@
+{
+  "policy_id": "policy.tools.mutation_state",
+  "schema_version": "1.0",
+  "title": "Mutation action lifecycle authorization",
+  "requirement": "Candidate repository mutations occur only in IMPLEMENTING.",
+  "policy_class": "immutable_root",
+  "owner_component": "KOV.control.policies.PolicyRegistry",
+  "enforcement": "Mutation action kinds require LifecycleState.IMPLEMENTING.",
+  "applicable_states": ["implementing"],
+  "verification_tests": ["tests/unit/test_control.py::test_mutation_requires_implementing"],
+  "failure_mode": "fail_closed",
+  "enabled": true
+}

@@ -1,0 +1,13 @@
+{
+  "policy_id": "policy.tools.read_state",
+  "schema_version": "1.0",
+  "title": "Read action lifecycle authorization",
+  "requirement": "Repository reads occur only during evidence-bearing lifecycle states.",
+  "policy_class": "protected_controller",
+  "owner_component": "KOV.control.policies.PolicyRegistry",
+  "enforcement": "Action kind and lifecycle state are matched deterministically.",
+  "applicable_states": ["triaging", "researching", "hypothesizing", "baselining", "implementing", "validating_syntax", "testing", "reviewing"],
+  "verification_tests": ["tests/unit/test_control.py::test_read_action_state_authorization"],
+  "failure_mode": "fail_closed",
+  "enabled": true
+}

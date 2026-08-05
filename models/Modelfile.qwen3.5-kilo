@@ -1,0 +1,4 @@
+FROM qwen3.5:9b
+
+# KOV's capacity ceiling. Role prompts deliberately stay well below this value.
+PARAMETER num_ctx 32768
