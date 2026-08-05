@@ -1,0 +1,13 @@
+{
+  "policy_id": "policy.control.degraded",
+  "schema_version": "1.0",
+  "title": "Degraded mode is read-only",
+  "requirement": "Missing required enforcement blocks mutation and promotion.",
+  "policy_class": "immutable_root",
+  "owner_component": "KOV.control.policies.PolicyRegistry",
+  "enforcement": "Only read actions are authorized while degraded.",
+  "applicable_states": ["degraded"],
+  "verification_tests": ["tests/unit/test_control.py::test_degraded_mode_blocks_mutation"],
+  "failure_mode": "fail_closed",
+  "enabled": true
+}

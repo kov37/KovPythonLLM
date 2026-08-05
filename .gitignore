@@ -106,6 +106,10 @@ dmypy.json
 
 # KOV specific
 kov.log
+.kov-state/
+dashboard/node_modules/
+dashboard/dist/
+dashboard/*.tsbuildinfo
 test_*.txt
 hello.py
 interactive_test.py

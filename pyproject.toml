@@ -1,0 +1,86 @@
+[build-system]
+requires = ["setuptools>=75", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "kov-agent"
+version = "0.1.0"
+description = "A deterministic local repository engineering and continual improvement agent."
+readme = "README.md"
+requires-python = ">=3.12"
+license = { file = "LICENSE" }
+authors = [{ name = "KOV Development Team" }]
+dependencies = [
+  "fastapi>=0.141,<1",
+  "google-adk==2.6.1",
+  "httpx==0.28.1",
+  "litellm==1.94.1",
+  "ollama>=0.6,<1",
+  "pydantic>=2.11,<3",
+  "requests>=2.32,<3",
+  "rich>=13,<15",
+  "typer>=0.16,<1",
+  "uvicorn>=0.35,<1",
+]
+
+[project.optional-dependencies]
+test = [
+  "hypothesis>=6,<7",
+  "pyright>=1.1,<2",
+  "pytest>=9,<10",
+  "pytest-asyncio>=1.2,<2",
+  "ruff>=0.14,<1",
+]
+
+[project.scripts]
+kov = "KOV.cli.main:app"
+kov-dashboard = "KOV.api.server:main"
+
+[tool.setuptools.packages.find]
+include = ["KOV*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+asyncio_mode = "auto"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+extend-exclude = [
+  ".venv",
+  "dashboard/node_modules",
+  "dashboard/dist",
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.pyright]
+pythonVersion = "3.12"
+typeCheckingMode = "basic"
+venvPath = "."
+venv = ".venv"
+include = [
+  "KOV/api",
+  "KOV/capabilities",
+  "KOV/contracts",
+  "KOV/control",
+  "KOV/diagnostics",
+  "KOV/deployment",
+  "KOV/git",
+  "KOV/learning",
+  "KOV/models",
+  "KOV/observations",
+  "KOV/promotion",
+  "KOV/runtime",
+  "KOV/self_improvement",
+  "KOV/storage",
+  "KOV/tools/atomic.py",
+  "KOV/tools/commands.py",
+  "KOV/workspaces",
+  "tests/test_doctor.py",
+  "tests/test_privacy.py",
+  "tests/unit",
+]
+exclude = [".venv"]

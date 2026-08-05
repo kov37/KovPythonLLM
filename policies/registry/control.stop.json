@@ -1,0 +1,13 @@
+{
+  "policy_id": "policy.control.stop",
+  "schema_version": "1.0",
+  "title": "Emergency Stop authority",
+  "requirement": "Emergency Stop blocks every model-requested action.",
+  "policy_class": "immutable_root",
+  "owner_component": "KOV.control.stop.StopController",
+  "enforcement": "PolicyRegistry.authorize_action checks the durable stop sentinel first.",
+  "applicable_states": [],
+  "verification_tests": ["tests/unit/test_control.py::test_stop_blocks_every_action"],
+  "failure_mode": "fail_closed",
+  "enabled": true
+}

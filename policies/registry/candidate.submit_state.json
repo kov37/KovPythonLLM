@@ -1,0 +1,13 @@
+{
+  "policy_id": "policy.candidate.submit_state",
+  "schema_version": "1.0",
+  "title": "Candidate submission lifecycle authorization",
+  "requirement": "The model may submit a candidate only from IMPLEMENTING.",
+  "policy_class": "protected_controller",
+  "owner_component": "KOV.control.policies.PolicyRegistry",
+  "enforcement": "SubmitCandidateAction requires LifecycleState.IMPLEMENTING.",
+  "applicable_states": ["implementing"],
+  "verification_tests": ["tests/unit/test_control.py::test_submission_requires_implementing"],
+  "failure_mode": "fail_closed",
+  "enabled": true
+}
